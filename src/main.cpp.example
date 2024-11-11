@@ -1,0 +1,89 @@
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <cstdint>
+
+// Utility function to convert a 256-bit hash (32-byte array) to a hex string
+std::string toHexString(const std::vector<uint8_t>& data) {
+    std::ostringstream oss;
+    for (auto byte : data) {
+        oss << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
+    }
+    return oss.str();
+}
+
+// A more aggressive mix function for creating a stronger avalanche effect
+void enhancedMix(uint64_t& a, uint64_t& b, uint64_t& c, uint64_t& d) {
+    // Perform multiple non-linear operations, including XOR, rotation, and shifts
+    a = (a ^ b) + (c ^ d); 
+    b = (b ^ c) + (a ^ d); 
+    c = (c ^ d) + (a ^ b); 
+    d = (d ^ a) + (b ^ c);
+    
+    a ^= (b << 15) | (b >> (64 - 15));
+    b ^= (c << 21) | (c >> (64 - 21));
+    c ^= (d << 29) | (d >> (64 - 29));
+    d ^= (a << 31) | (a >> (64 - 31));
+
+    // Further diffusion steps with circular shifts
+    a += (d << 17) | (d >> (64 - 17));
+    b += (a << 23) | (a >> (64 - 23));
+    c += (b << 19) | (b >> (64 - 19));
+    d += (c << 13) | (c >> (64 - 13));
+}
+
+// Enhanced custom hashing algorithm that produces a 256-bit hash
+std::vector<uint8_t> enhancedCustomHash256(const std::string& input) {
+    const size_t HASH_SIZE = 32; // 256 bits / 8 = 32 bytes
+    std::vector<uint8_t> hash(HASH_SIZE, 0);
+
+    // Initial values (32 bytes of arbitrary primes)
+    uint64_t init_values[4] = {
+        0x243F6A8885A308D3, 0x13198A2E03707344,
+        0xA4093822299F31D0, 0x082EFA98EC4E6C89
+    };
+
+    uint64_t state[4];
+    for (int i = 0; i < 4; ++i) {
+        state[i] = init_values[i];
+    }
+
+    // Process input and XOR into state
+    for (size_t i = 0; i < input.size(); ++i) {
+        state[i % 4] ^= static_cast<uint64_t>(input[i]) << (8 * (i % 8));
+        // Apply mixing after each character
+        enhancedMix(state[0], state[1], state[2], state[3]);
+    }
+
+    // Additional mixing rounds for better avalanche effect
+    for (int i = 0; i < 64; ++i) {  // More rounds to improve diffusion
+        enhancedMix(state[0], state[1], state[2], state[3]);
+    }
+
+    // Convert the 256-bit state to the final hash (32 bytes)
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 8; ++j) {
+            hash[i * 8 + j] = (state[i] >> (8 * j)) & 0xFF;
+        }
+    }
+
+    return hash;
+}
+
+int main() {
+    std::string input;
+    std::cout << "Enter input to hash: ";
+    std::getline(std::cin, input);
+
+    // Get the enhanced 256-bit hash in bytes
+    std::vector<uint8_t> hash = enhancedCustomHash256(input);
+
+    // Convert the hash to hexadecimal format
+    std::string hexHash = toHexString(hash);
+
+    std::cout << "Hash (256-bit in hex): " << hexHash << std::endl;
+
+    return 0;
+}
